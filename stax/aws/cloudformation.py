@@ -364,7 +364,7 @@ class Cloudformation:
             return
 
         if not click.confirm(
-                f'Are you sure you want to {click.style("create", fg="green")} {self.name} in {self.region}?'
+                f'Are you sure you want to {click.style("create", fg="green")} {self.account}/{self.name} in {self.region}?'
         ):
             self.client.delete_change_set(ChangeSetName=changeset,
                                           StackName=self.name)
@@ -382,7 +382,7 @@ class Cloudformation:
         Create a stack via change set
         """
         if not click.confirm(
-                f'Are you sure you want to {click.style("delete", fg="red")} {self.name} in {self.region}?'
+                f'Are you sure you want to {click.style("delete", fg="red")} {self.account}/{self.name} in {self.region}?'
         ):
             return
         click.echo(f'Deleting {self.name} in {self.region}')
@@ -400,7 +400,7 @@ class Cloudformation:
             return
 
         if not click.confirm(
-                f'Are you sure you want to {click.style("update", fg="cyan")} {self.name} in {self.region}?'
+                f'Are you sure you want to {click.style("update", fg="cyan")} {click.style(self.account, bold=True)}/{self.name} in {self.region}?'
         ):
             self.client.delete_change_set(ChangeSetName=changeset,
                                           StackName=self.name)
