@@ -1,6 +1,7 @@
 # Custom modifications here!
 .direnv
 **/.DS_Store
+stax.json
 
 # Everything below Obtained directly from https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore
 
