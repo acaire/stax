@@ -61,7 +61,7 @@ class CLI(click.MultiCommand):
         """
         return [
             os.path.splitext(filename)[0][4:]
-            for filename in os.listdir(cmd_path)
+            for filename in sorted(os.listdir(cmd_path))
             if filename.endswith('.py') and filename.startswith('cmd_')
         ]
 
