@@ -6,6 +6,7 @@ Manage everything to do with Cloudformation
 import click
 import json
 import os
+import sys
 
 
 class Context:
@@ -17,11 +18,28 @@ class Context:
     """
     def __init__(self, debug):
         self._debug = debug
-        self.config = self.get_config()
+        self._config = None
+
+    @property
+    def config(self):
+        if not self._config:
+            self._config = self.get_config()
+        return self._config
 
     def get_config(self):
-        with open('stax.json', 'r') as fh:
-            return json.load(fh)
+        try:
+            with open('stax.json', 'r') as fh:
+                return json.load(fh)
+        except json.decoder.JSONDecodeError as err:
+            click.echo(click.style('Error decoding stacks.json: ', bold=True) +
+                       str(err),
+                       err=True)
+            sys.exit(1)
+        except FileNotFoundError:
+            click.echo(
+                click.style('stax.json not found', bold=True) +
+                ' - Run "stax generate > stax.json" to generate a sample')
+            sys.exit(1)
 
     def debug(self, msg):
         if self._debug:
