@@ -1,5 +1,6 @@
 import collections
 import os
+import sys
 
 import click
 
@@ -30,15 +31,18 @@ def default_accounts(ctx, param, value):
     Assemble the names of defined accounts
     to be used as CLI defaults
     """
-    accounts = [acc for acc in ctx.obj.config['accounts']]
+    try:
+        accounts = [acc for acc in ctx.obj.config['accounts']]
+    except KeyError:
+        sys.exit('Error: No accounts configured in stax.json')
+
     if value:
         result = [acc for acc in value if acc in accounts]
     else:
         result = accounts
 
     if len(result) < 1:
-        print(f'No accounts found matching {" or ".join(value)}')
-        exit(1)
+        sys.exit('No matching accounts found in stax.json')
 
     return result
 
