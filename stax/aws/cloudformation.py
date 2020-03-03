@@ -181,7 +181,7 @@ class Cloudformation:
             name=stack_json['StackName'],
             account=self.account,
             region=self.region,
-            params=template_json.get('Parameters', None),
+            params=stack_json.get('Parameters', None),
             template_body=template_body,
         )
 
