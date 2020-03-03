@@ -21,7 +21,7 @@ Install
 =======
 ## Homebrew:
 ```
-   brew tap acaire/taps/stax git@github.com:acaire/homebrew-taps.git
+   brew tap acaire/taps git@github.com:acaire/homebrew-taps.git
    brew install acaire/taps/stax
 ```
 
