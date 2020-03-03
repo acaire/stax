@@ -1,0 +1,5 @@
+awacs==0.9.7
+boto3==1.12.4
+python-dateutil==2.8.1
+troposphere==2.5.3
+Click==7.0
