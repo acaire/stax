@@ -62,7 +62,7 @@ class CLI(click.MultiCommand):
 
 
 @click.command(cls=CLI)
-@click.version_option(version="0.0.1")
+@click.version_option(version="0.1.0")
 @click.option("--debug", is_flag=True)
 @click.pass_context
 def cli(ctx, debug):
