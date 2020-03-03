@@ -2,11 +2,18 @@
 Git Helpers
 """
 
+import click
 import os
 import git
 import subprocess, shlex
 
-REPO = git.Repo(os.getcwd(), search_parent_directories=True)
+try:
+    REPO = git.Repo(os.getcwd(), search_parent_directories=True)
+except git.exc.InvalidGitRepositoryError:
+    click.secho('Error! Please run stax inside a git managed path',
+                fg='red',
+                err=True)
+    exit(1)
 
 
 def current_branch():
