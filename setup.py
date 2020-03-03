@@ -16,7 +16,6 @@ setup(
     name='stax',
     description=
     'Stax is a Python tool to manage every aspect of Cloudformation Stacks',
-    long_description=open('README.md').read(),
     version=get_version(),
     license='MIT',
     install_requires=[
