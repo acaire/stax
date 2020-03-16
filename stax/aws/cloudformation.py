@@ -58,17 +58,6 @@ class Template:
     def to_dict(self):
         return json.loads(self.raw)
 
-    @property
-    def to_troposphere(self):
-        """
-        Return Troposphere parsed object
-        """
-        try:
-            return TemplateGenerator(self.to_dict)
-        except:
-            raise ValueError(f'{self.name} failed on template {self.template}')
-
-
 class Params:
     def __init__(self, params):
         """
