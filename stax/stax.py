@@ -77,6 +77,8 @@ class CLI(click.MultiCommand):
             raise Exception(
                 f'Please check {mod_path} ({cmd_path}/{name}.py), you need to define a function named {name}'
             )
+        except ModuleNotFoundError:
+            pass
 
 
 @click.command(cls=CLI)
