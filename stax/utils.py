@@ -4,26 +4,7 @@ import sys
 
 import click
 
-from . import gitlib
 from .aws.cloudformation import Stack, DEFAULT_AWS_REGIONS
-
-
-def default_tags(ctx):
-    """
-    Return some default tags based on chosen CI
-    """
-    if ctx.obj.config.get('ci') == 'buildkite':
-        return {
-            "BUILDKITE_COMMIT":
-            os.getenv("BUILDKITE_COMMIT", gitlib.current_branch()),
-            "BUILDKITE_BUILD_URL":
-            os.getenv("BUILDKITE_BUILD_URL", "dev"),
-            "BUILDKITE_REPO":
-            os.getenv("BUILDKITE_REPO", "dev"),
-            "BUILDKITE_BUILD_CREATOR":
-            os.getenv("BUILDKITE_BUILD_CREATOR", gitlib.user_email()),
-        }
-    return {}
 
 
 def default_accounts(ctx, param, value):
@@ -101,7 +82,9 @@ def set_stacks(ctx):
               region=region,
               params=params_file if params_file else None,
               template_file=stack['template'],
-              tags=default_tags(ctx))
+              tags=stack.get('tags', {}),
+              purge=stack.get('purge', False)
+        )
         for name, stack in ctx.obj.config['stacks'].items() for region in
         stack.get('regions',
                   [ctx.obj.config.get('default_region', 'ap-southeast-2')])

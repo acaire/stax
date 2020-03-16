@@ -1,5 +1,9 @@
 import collections
+import datetime
+import hashlib
+import itertools
 import json
+import os
 import sys
 import time
 import uuid
@@ -8,10 +12,29 @@ import yaml
 import boto3
 import botocore
 import click
-import datetime
+import halo
 
 from .connection_manager import get_client
+from .. import gitlib
 from ..exceptions import StackNotFound
+
+SUCCESS_STATES = [
+    'CREATE_COMPLETE',
+    'DELETE_COMPLETE',
+    'IMPORT_COMPLETE',
+    'UPDATE_COMPLETE',
+]
+
+FAILURE_STATES = [
+    'CREATE_FAILED',
+    'DELETE_FAILED',
+    'IMPORT_ROLLBACK_COMPLETE',
+    'IMPORT_ROLLBACK_FAILED',
+    'ROLLBACK_COMPLETE',
+    'ROLLBACK_FAILED',
+    'UPDATE_ROLLBACK_COMPLETE',
+    'UPDATE_ROLLBACK_FAILED',
+]
 
 DEFAULT_AWS_REGIONS = [
     'ap-northeast-1',
@@ -31,7 +54,6 @@ DEFAULT_AWS_REGIONS = [
     'us-west-1',
     'us-west-2',
 ]
-
 
 class Template:
     def __init__(self, template_body=None, template_file=None):
@@ -83,6 +105,10 @@ class Params:
             raise ValueError('Unexpected value for Params class')
 
     @property
+    def raw(self):
+        return json.dumps(self.params)
+
+    @property
     def to_dict(self):
         if self.type == 'file':
             with open(self.params) as fh:
@@ -128,13 +154,12 @@ class Tags:
             return {tag['Key']: tag['Value'] for tag in self.tags}
         return self.tags
 
-    @property
-    def to_list(self):
+    def to_list(self, extra_tags={}):
         if self.type != 'list' and self.tags is not None:
             return [{
                 "Key": k,
                 "Value": v
-            } for k, v in self.tags.items()] if self.type is not None else None
+            } for k, v in {**extra_tags, **self.tags}.items()] if self.type is not None else None
         return self.tags
 
 
@@ -214,8 +239,11 @@ class Cloudformation:
                 json.dump(stack_json, fh_write, sort_keys=True, indent=4)
 
     def generate_stacks(self, local_stacks={}, stack_name=None, force=False):
-
-        for remote_stack in self.describe_stacks(stack_name):
+        """
+        Pull down a list of created AWS stacks, and
+        generate the configuration locally
+        """
+        for _, remote_stack in self.describe_stacks(stack_name).items():
             try:
                 parsed_stack = self.gen_stack(remote_stack)
             except ValueError as err:
@@ -230,28 +258,34 @@ class Cloudformation:
                     f'Skipping stack {parsed_stack.name} as it exists in stax.json - The live stack may differ, use --force to force'
                 )
 
-    def describe_stacks(self, name):
+    def describe_stacks(self, name=None):
         """
         Describe existing stacks
         """
         kwargs = {}
-        if name:
+        if name is not None:
             kwargs['StackName'] = name
 
         paginator = self.client.get_paginator('describe_stacks')
         response_iterator = paginator.paginate(**kwargs)
 
         try:
-            return sorted([
-                stack for response in response_iterator
-                for stack in response['Stacks']
-            ],
-                          key=lambda k: k['StackName'])
+            return {stack['StackName']: stack for response in response_iterator for stack in response['Stacks']}
         except botocore.exceptions.ClientError as err:
             if err.response['Error']['Message'].find('does not exist') != -1:
-                click.echo(f'{name} stack does not exist')
-                return []
+                raise StackNotFound(f'{name} stack does not exist')
             raise
+
+    @property
+    def exists(self):
+        """
+        Determine if an individual stack exists
+        """
+        try:
+            if self.describe_stacks(name=self.name):
+                return True
+        except StackNotFound:
+            return False
 
     @property
     def context(self):
@@ -274,35 +308,62 @@ class Cloudformation:
         """
         return self.context.config['accounts'][self.account]['profile']
 
-    def wait_for_stack_update(self):
+    @property
+    def default_tags(self):
+        """
+        Return some default tags based on chosen CI
+        """
+        if 'buildkite' in self.context.config.get('ci', {}):
+            return {
+                "BUILDKITE_COMMIT":
+                os.getenv("BUILDKITE_COMMIT", gitlib.current_branch()),
+                "BUILDKITE_BUILD_URL":
+                os.getenv("BUILDKITE_BUILD_URL", "dev"),
+                "BUILDKITE_REPO":
+                os.getenv("BUILDKITE_REPO", "dev"),
+                "BUILDKITE_BUILD_CREATOR":
+                os.getenv("BUILDKITE_BUILD_CREATOR", gitlib.user_email()),
+                "STAX_HASH": self.hash_of_params_and_template,
+            }
+        return {}
+
+    def wait_for_stack_update(self, action=None):
         """
         Wait for a stack change/update
         """
+        kwargs = {'text': '{self.name}: {action} Pending'}
+        if action == 'deletion':
+            kwargs['color'] = 'red'
+        spinner = halo.Halo(**kwargs)
+        spinner.start()
+
         while True:
             try:
                 req = self.client.describe_stacks(StackName=self.name)
             except botocore.exceptions.ClientError as err:
                 if err.response['Error']['Message'].find(
                         'does not exist') != -1:
+                    if action == 'deletion':
+                        return spinner.succeed(f'{self.name}: DELETE_COMPLETE (or stack not found)')
                     raise StackNotFound(f'{self.name} stack no longer exists')
                 raise
 
             status = req['Stacks'][0]['StackStatus']
-            if status.endswith(('FAILED', 'COMPLETE')):
-                break
+
+            spinner.text = f'{self.name}: {status}'
+            if status in FAILURE_STATES:
+                return spinner.fail()
+            elif status in SUCCESS_STATES:
+                return spinner.succeed()
+
             time.sleep(1)
-        if status in ['CREATE_COMPLETE']:
-            click.secho('Stack created ✅', fg='green')
-        elif status.endswith(('FAILED')):
-            click.secho('Stack failed ❌', fg='red')
 
     def changeset_create_and_wait(self, set_type):
         """
         Request a changeset, and wait for creation
         """
-        print(
-            f'Creating {set_type.lower()} changeset for {self.name} in {self.region}'
-        )
+        spinner = halo.Halo(text=f'Creating {set_type.lower()} changeset for {self.name}/{self.account} in {self.region}')
+        spinner.start()
         # Create Changeset
         kwargs = dict(
             ChangeSetName=f'stax-{uuid.uuid4()}',
@@ -314,7 +375,7 @@ class Cloudformation:
         if params_passed:
             kwargs['Parameters'] = params_passed
 
-        tags_passed = self.tags.to_list
+        tags_passed = self.tags.to_list(extra_tags=self.default_tags)
         if tags_passed:
             kwargs['Tags'] = tags_passed
 
@@ -324,9 +385,12 @@ class Cloudformation:
             cs_id = req['Id']
         except botocore.exceptions.ClientError as err:
             err_msg = err.response['Error']['Message']
+            spinner.fail(f'{self.name}: {err.response["Error"]["Message"]}')
             if err_msg.find('does not exist') != -1:
+                #spinner.fail(f'{self.name} does not exist')
                 raise StackNotFound(f'{self.name} stack no longer exists')
-            raise
+            sys.exit(1)
+
 
         # Wait for it to be ready
         while True:
@@ -336,8 +400,9 @@ class Cloudformation:
             time.sleep(1)
         if 'StatusReason' in req and req['StatusReason'].find(
                 "didn't contain changes") != -1:
-            click.echo(f'{self.name} in {self.region} is up to date')
+            spinner.succeed(f'{self.name}/{self.account} in {self.region} is up to date!\n')
             return
+        spinner.succeed()
 
         parse_changeset_changes(req['Changes'])
         return cs_id
@@ -376,7 +441,7 @@ class Cloudformation:
             return
         click.echo(f'Deleting {self.name} in {self.region}')
         req = self.client.delete_stack(StackName=self.name)
-        self.wait_for_stack_update()
+        self.wait_for_stack_update('deletion')
 
     def update(self):
         """
@@ -415,7 +480,9 @@ class Stack(Cloudformation):
                  params=None,
                  tags=None,
                  template_body=None,
-                 template_file=None):
+                 template_file=None,
+                 purge=False,
+                 ):
 
         # Adopt parent class methods/attributes
         super().__init__()
@@ -425,7 +492,6 @@ class Stack(Cloudformation):
         self.region = region
 
         self.params = Params(params=params)
-        self.tags = Tags(tags=tags)
 
         if [template_body, template_file].count(None) != 1:
             raise ValueError(
@@ -435,6 +501,25 @@ class Stack(Cloudformation):
             self.template = Template(template_body=template_body)
         else:
             self.template = Template(template_file=template_file)
+
+        self.tags = Tags(tags=tags)
+
+        self.purge = purge
+
+    @property
+    def hash_of_params_and_template(self):
+        """
+        Hash parameters and templates to quickly determine if a stack needs to be updated
+        """
+        return hashlib.sha256(self.template.raw.encode('utf-8') + self.params.raw.encode('utf-8')).hexdigest()
+
+    def pending_update(self, stax_hash):
+        """
+        Determine if a stack needs to be updated by the lack or mismatch of `STAX_HASH` tag
+        """
+        if self.hash_of_params_and_template != stax_hash:
+            return True
+        return False
 
     def __members(self):
         return (self.account, self.region, self.name)
