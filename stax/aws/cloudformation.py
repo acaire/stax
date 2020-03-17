@@ -18,6 +18,8 @@ from .connection_manager import get_client
 from .. import gitlib
 from ..exceptions import StackNotFound
 
+yaml.add_multi_constructor('!', lambda loader, suffix, node: None)
+
 SUCCESS_STATES = [
     'CREATE_COMPLETE',
     'DELETE_COMPLETE',
@@ -57,28 +59,29 @@ DEFAULT_AWS_REGIONS = [
 
 class Template:
     def __init__(self, template_body=None, template_file=None):
-        """
-        Assemble a Template class by either passing in a:
-          string - To convert to a template dict
-          dict   - To parse as JSON
-        """
         self.body = template_body
         self.file = template_file
+        self.extn = 'json'
 
         if self.body and self.file:
             raise ValueError('You must specify one of either body or file')
 
     @property
     def raw(self):
-        if self.body:
-            return self.body
-        else:
+        if not self.body:
             with open(self.file) as fh:
-                return fh.read()
+                self.body = fh.read()
+        return self.body
 
     @property
     def to_dict(self):
-        return json.loads(self.raw)
+        if isinstance(self.raw, str):
+            try:
+                return json.loads(self.raw)
+            except:
+                self.extn = 'yaml'
+                return yaml.load(self.raw, Loader=yaml.BaseLoader)
+        return self.raw
 
 class Params:
     def __init__(self, params):
@@ -179,38 +182,51 @@ class Cloudformation:
         return get_client(self.profile, self.region, 'cloudformation')
 
     def gen_stack(self, stack_json):
-        template_json = self.client.get_template(
-            StackName=stack_json['StackName'])['TemplateBody']
         if stack_json['StackName'].startswith('StackSet'):
             raise ValueError(f'Ignoring StackSet {stack_json["StackName"]}')
+
+        attempt = 0
+        while True:
+            try:
+                raw_template = self.client.get_template(
+                    StackName=stack_json['StackName'])['TemplateBody']
+                break
+            except botocore.exceptions.ClientError as err:
+                if err.response['Error']['Message'].find('Throttling') != -1:
+                    if attempt > 10:
+                        raise
+                    time.sleep(2 ^ attempt * 100)
+                    attempt += 1
+                else:
+                    raise
+
+        stack = Stack(
+            name=stack_json['StackName'],
+            account=self.account,
+            region=self.region,
+            params=stack_json.get('Parameters', None),
+            template_body=raw_template,
+        )
+
+        # Ignore serverless
         try:
-            template_json['Outputs']['ServerlessDeploymentBucketName']
+            stack.template.to_dict['Outputs']['ServerlessDeploymentBucketName']
         except:
             pass
         else:
             raise ValueError(
                 f'Ignoring serverless stack {stack_json["StackName"]}')
-        template_body = json.dumps(template_json)
-        return Stack(
-            name=stack_json['StackName'],
-            account=self.account,
-            region=self.region,
-            params=stack_json.get('Parameters', None),
-            template_body=template_body,
-        )
+
+        return stack
 
     def save_stack(self, stack):
-        try:
-            template_dest = f'aws/{stack.name}.{stack.account}.json'
-            with open(template_dest, 'w') as fh:
+        template_dest = f'aws/{stack.name}.{stack.account}.{stack.template.extn}'
+        with open(template_dest, 'w') as fh:
+            if stack.template.extn == 'yaml':
+                yaml.dump(stack.template.to_dict, fh, sort_keys=True)
+            else:
                 json.dump(stack.template.to_dict, fh, sort_keys=True, indent=4)
-        except (json.decoder.JSONDecodeError, TypeError,
-                yaml.constructor.ConstructorError):
-            raise
-            # Just write it out, perhaps it's YAML
-            template_dest = f'aws/{stack.name}.{stack.account}.yaml'
-            with open(template_dest, 'w') as fh:
-                fh.write(stack.template_body)
+
         has_params = stack.params.to_dict
         if has_params:
             with open(f'new-params/{stack.name}.{stack.account}.json',
