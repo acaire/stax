@@ -346,6 +346,14 @@ class Cloudformation:
             }
         return {}
 
+    @property
+    def resources(self):
+        """
+        Return stack resources
+        """
+        req = self.client.describe_stack_resources(StackName=self.name)
+        return req['StackResources']
+
     def wait_for_stack_update(self, action=None):
         """
         Wait for a stack change/update
