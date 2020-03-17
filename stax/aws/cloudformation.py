@@ -592,11 +592,15 @@ def parse_changeset_changes(changes):
                 f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be added',
                 fg='green')
         elif rc['Action'] == 'Modify':
-            deletion = click.style(
-                'by deletion and recreation',
+            mod_type = click.style(
+                'by deletion and recreation ',
                 fg='red') if rc['Replacement'] in ['True', True] else ''
+
+            scope_and_causing_entities = ','.join([f'{scope}(' + ','.join([det['CausingEntity'] for det in rc['Details'] if 'CausingEntity' in det])+ ')' for scope in rc['Scope']])
+
+            cause = f'caused by changes to: {scope_and_causing_entities}'
             click.secho(
-                f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be modified {deletion}',
+                f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be modified {mod_type}{cause}',
                 fg='yellow')
         elif rc['Action'] == 'Remove':
             click.secho(
