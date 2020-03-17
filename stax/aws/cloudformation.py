@@ -260,6 +260,9 @@ class Cloudformation:
         generate the configuration locally
         """
         for _, remote_stack in self.describe_stacks(stack_name).items():
+            if remote_stack['StackStatus'] in ['REVIEW_IN_PROGRESS']:
+                print(f'Skipping {remote_stack["StackName"]} due to {remote_stack["StackStatus"]} status')
+                continue
             try:
                 parsed_stack = self.gen_stack(remote_stack)
             except ValueError as err:
