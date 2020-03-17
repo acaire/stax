@@ -15,7 +15,9 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 @click.command()
 @stack_options
 @click.option('--force', is_flag=True)
-def push(ctx, accounts, regions, name, force):
+@click.option('--use-existing-params', is_flag=True)
+@click.option('--skip-tags', is_flag=True)
+def push(ctx, accounts, regions, name, force, use_existing_params, skip_tags):
     """
     Create/Update live stacks
     """
@@ -64,7 +66,7 @@ def push(ctx, accounts, regions, name, force):
     for stack in to_change:
         if stack.purge is False:
             try:
-                stack.update()
+                stack.update(use_existing_params=use_existing_params, skip_tags=skip_tags)
             except StackNotFound:
                 stack.create()
             else:

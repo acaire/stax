@@ -377,7 +377,7 @@ class Cloudformation:
 
             time.sleep(1)
 
-    def changeset_create_and_wait(self, set_type):
+    def changeset_create_and_wait(self, set_type, use_existing_params=False, skip_tags=False):
         """
         Request a changeset, and wait for creation
         """
@@ -390,13 +390,24 @@ class Cloudformation:
             TemplateBody=self.template.raw,
             Capabilities=["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"],
         )
-        params_passed = self.params.to_list
-        if params_passed:
-            kwargs['Parameters'] = params_passed
+        if use_existing_params:
+            stack_describe = self.describe_stacks(name=self.name)[self.name]
+            if 'Parameters' in stack_describe:
+                kwargs['Parameters'] = stack_describe['Parameters'].copy()
+                for param in kwargs['Parameters']:
+                    param['UsePreviousValue'] = True
+                    del(param['ParameterValue'])
+                    if 'ResolvedValue' in param:
+                        del(param['ResolvedValue'])
+        else:
+            params_passed = self.params.to_list
+            if params_passed:
+                kwargs['Parameters'] = params_passed
 
-        tags_passed = self.tags.to_list(extra_tags=self.default_tags)
-        if tags_passed:
-            kwargs['Tags'] = tags_passed
+        if not skip_tags:
+            tags_passed = self.tags.to_list(extra_tags=self.default_tags)
+            if tags_passed:
+                kwargs['Tags'] = tags_passed
 
         try:
             req = self.client.create_change_set(ChangeSetType=set_type,
@@ -462,12 +473,12 @@ class Cloudformation:
         req = self.client.delete_stack(StackName=self.name)
         self.wait_for_stack_update('deletion')
 
-    def update(self):
+    def update(self, use_existing_params, skip_tags):
         """
         Update a stack via change set
         """
         # Create changeset
-        changeset = self.changeset_create_and_wait('UPDATE')
+        changeset = self.changeset_create_and_wait('UPDATE', use_existing_params=use_existing_params, skip_tags=skip_tags)
 
         if not changeset:
             return
