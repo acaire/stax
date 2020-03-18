@@ -23,6 +23,7 @@ setup(
         'PyYAML',
         'boto3',
         'click',
+        'halo',
     ],
     url='https://github.com/acaire/stax',
     packages=find_packages(exclude=['tests*']),
