@@ -14,6 +14,7 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 
 @click.command()
 @stack_options
+@click.argument('name', required=False)
 @click.option('--force', is_flag=True)
 @click.option('--use-existing-params', is_flag=True)
 @click.option('--skip-tags', is_flag=True)

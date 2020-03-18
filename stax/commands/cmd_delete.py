@@ -9,11 +9,11 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 
 @click.command()
 @stack_options
+@click.argument('name', required=True)
 def delete(ctx, accounts, regions, name):
     """
-    Delete live stacks
+    Delete a single live stack
     """
-
     set_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,

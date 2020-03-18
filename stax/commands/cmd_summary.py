@@ -10,6 +10,7 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 
 @click.command()
 @stack_options
+@click.argument('name', required=False)
 def summary(ctx, accounts, regions, name):
     """
     Show stax.json summary

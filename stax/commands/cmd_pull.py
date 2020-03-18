@@ -9,6 +9,7 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 
 @click.command()
 @stack_options
+@click.argument('name', required=False)
 @click.option('--force', is_flag=True)
 def pull(ctx, accounts, regions, name, force):
     """
