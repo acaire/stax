@@ -55,4 +55,5 @@ def generate():
     )
     click.echo(json.dumps(content, sort_keys=True, indent=4))
     if os.fstat(0) == os.fstat(1):
-        click.echo(click.style('Redirect to stax.json to save this file', bold=True))
+        click.echo(
+            click.style('Redirect to stax.json to save this file', bold=True))

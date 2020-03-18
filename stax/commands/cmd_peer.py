@@ -35,7 +35,10 @@ def peer(ctx, accounts, regions, name):
 
         stack_dict = stack.template.to_dict
 
-        print(stack_dict['Outputs'] if stack.template.to_dict['Outputs'] else None)
+        print(stack_dict['Outputs'] if stack.template.
+              to_dict['Outputs'] else None)
 
         for resource in stack.resources:
-            print(resource['LogicalResourceId'], resource['PhysicalResourceId'], resource['ResourceStatus'], resource.get('ResourceStatusReason', ''))
+            print(resource['LogicalResourceId'],
+                  resource['PhysicalResourceId'], resource['ResourceStatus'],
+                  resource.get('ResourceStatusReason', ''))

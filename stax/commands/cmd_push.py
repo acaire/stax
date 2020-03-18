@@ -53,7 +53,11 @@ def push(ctx, accounts, regions, name, force, use_existing_params, skip_tags):
                 with halo.Halo('Fetching stack status'):
                     describe_stacks[key] = cf.describe_stacks()
             try:
-                stax_hash = [tag['Value'] for tag in describe_stacks[key][stack.name]['Tags'] if tag['Key'] == 'STAX_HASH'][0]
+                stax_hash = [
+                    tag['Value']
+                    for tag in describe_stacks[key][stack.name]['Tags']
+                    if tag['Key'] == 'STAX_HASH'
+                ][0]
             except (KeyError, IndexError):
                 stax_hash = None
             if stack.pending_update(stax_hash):
@@ -62,12 +66,15 @@ def push(ctx, accounts, regions, name, force, use_existing_params, skip_tags):
         click.echo('No stacks found to update')
         sys.exit(1)
 
-    print('{} to update... {}\n'.format(plural(len(to_change), 'stack'), [stack.name for stack in to_change] if to_change else ''))
+    print('{} to update... {}\n'.format(
+        plural(len(to_change), 'stack'),
+        [stack.name for stack in to_change] if to_change else ''))
     # Update should be more common than create, so let's assume that and save time
     for stack in to_change:
         if stack.purge is False:
             try:
-                stack.update(use_existing_params=use_existing_params, skip_tags=skip_tags)
+                stack.update(use_existing_params=use_existing_params,
+                             skip_tags=skip_tags)
             except StackNotFound:
                 stack.create()
             else:

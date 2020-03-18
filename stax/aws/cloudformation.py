@@ -57,6 +57,7 @@ DEFAULT_AWS_REGIONS = [
     'us-west-2',
 ]
 
+
 class Template:
     def __init__(self, template_body=None, template_file=None):
         self.body = template_body
@@ -82,6 +83,7 @@ class Template:
                 self.extn = 'yaml'
                 return yaml.load(self.raw, Loader=yaml.BaseLoader)
         return self.raw
+
 
 class Params:
     def __init__(self, params):
@@ -162,7 +164,10 @@ class Tags:
             return [{
                 "Key": k,
                 "Value": v
-            } for k, v in {**extra_tags, **self.tags}.items()] if self.type is not None else None
+            } for k, v in {
+                **extra_tags,
+                **self.tags
+            }.items()] if self.type is not None else None
         return self.tags
 
 
@@ -261,7 +266,9 @@ class Cloudformation:
         """
         for _, remote_stack in self.describe_stacks(stack_name).items():
             if remote_stack['StackStatus'] in ['REVIEW_IN_PROGRESS']:
-                print(f'Skipping {remote_stack["StackName"]} due to {remote_stack["StackStatus"]} status')
+                print(
+                    f'Skipping {remote_stack["StackName"]} due to {remote_stack["StackStatus"]} status'
+                )
                 continue
             try:
                 parsed_stack = self.gen_stack(remote_stack)
@@ -289,7 +296,11 @@ class Cloudformation:
         response_iterator = paginator.paginate(**kwargs)
 
         try:
-            return {stack['StackName']: stack for response in response_iterator for stack in response['Stacks']}
+            return {
+                stack['StackName']: stack
+                for response in response_iterator
+                for stack in response['Stacks']
+            }
         except botocore.exceptions.ClientError as err:
             if err.response['Error']['Message'].find('does not exist') != -1:
                 raise StackNotFound(f'{name} stack does not exist')
@@ -342,7 +353,8 @@ class Cloudformation:
                 os.getenv("BUILDKITE_REPO", "dev"),
                 "BUILDKITE_BUILD_CREATOR":
                 os.getenv("BUILDKITE_BUILD_CREATOR", gitlib.user_email()),
-                "STAX_HASH": self.hash_of_params_and_template,
+                "STAX_HASH":
+                self.hash_of_params_and_template,
             }
         return {}
 
@@ -371,7 +383,9 @@ class Cloudformation:
                 if err.response['Error']['Message'].find(
                         'does not exist') != -1:
                     if action == 'deletion':
-                        return spinner.succeed(f'{self.name}: DELETE_COMPLETE (or stack not found)')
+                        return spinner.succeed(
+                            f'{self.name}: DELETE_COMPLETE (or stack not found)'
+                        )
                     raise StackNotFound(f'{self.name} stack no longer exists')
                 raise
 
@@ -385,11 +399,17 @@ class Cloudformation:
 
             time.sleep(1)
 
-    def changeset_create_and_wait(self, set_type, use_existing_params=False, skip_tags=False):
+    def changeset_create_and_wait(self,
+                                  set_type,
+                                  use_existing_params=False,
+                                  skip_tags=False):
         """
         Request a changeset, and wait for creation
         """
-        spinner = halo.Halo(text=f'Creating {set_type.lower()} changeset for {self.name}/{self.account} in {self.region}')
+        spinner = halo.Halo(
+            text=
+            f'Creating {set_type.lower()} changeset for {self.name}/{self.account} in {self.region}'
+        )
         spinner.start()
         # Create Changeset
         kwargs = dict(
@@ -404,9 +424,9 @@ class Cloudformation:
                 kwargs['Parameters'] = stack_describe['Parameters'].copy()
                 for param in kwargs['Parameters']:
                     param['UsePreviousValue'] = True
-                    del(param['ParameterValue'])
+                    del (param['ParameterValue'])
                     if 'ResolvedValue' in param:
-                        del(param['ResolvedValue'])
+                        del (param['ResolvedValue'])
         else:
             params_passed = self.params.to_list
             if params_passed:
@@ -429,7 +449,6 @@ class Cloudformation:
                 raise StackNotFound(f'{self.name} stack no longer exists')
             sys.exit(1)
 
-
         # Wait for it to be ready
         while True:
             req = self.client.describe_change_set(ChangeSetName=cs_id)
@@ -438,7 +457,9 @@ class Cloudformation:
             time.sleep(1)
         if 'StatusReason' in req and req['StatusReason'].find(
                 "didn't contain changes") != -1:
-            spinner.succeed(f'{self.name}/{self.account} in {self.region} is up to date!\n')
+            spinner.succeed(
+                f'{self.name}/{self.account} in {self.region} is up to date!\n'
+            )
             return
         spinner.succeed()
 
@@ -486,7 +507,10 @@ class Cloudformation:
         Update a stack via change set
         """
         # Create changeset
-        changeset = self.changeset_create_and_wait('UPDATE', use_existing_params=use_existing_params, skip_tags=skip_tags)
+        changeset = self.changeset_create_and_wait(
+            'UPDATE',
+            use_existing_params=use_existing_params,
+            skip_tags=skip_tags)
 
         if not changeset:
             return
@@ -511,16 +535,17 @@ class Stack(Cloudformation):
     Stack class to represent how we define stacks as humans
     not how AWS expects them to be
     """
-    def __init__(self,
-                 name,
-                 account,
-                 region,
-                 params=None,
-                 tags=None,
-                 template_body=None,
-                 template_file=None,
-                 purge=False,
-                 ):
+    def __init__(
+        self,
+        name,
+        account,
+        region,
+        params=None,
+        tags=None,
+        template_body=None,
+        template_file=None,
+        purge=False,
+    ):
 
         # Adopt parent class methods/attributes
         super().__init__()
@@ -549,7 +574,9 @@ class Stack(Cloudformation):
         """
         Hash parameters and templates to quickly determine if a stack needs to be updated
         """
-        return hashlib.sha256(self.template.raw.encode('utf-8') + self.params.raw.encode('utf-8')).hexdigest()
+        return hashlib.sha256(
+            self.template.raw.encode('utf-8') +
+            self.params.raw.encode('utf-8')).hexdigest()
 
     def pending_update(self, stax_hash):
         """
@@ -596,7 +623,12 @@ def parse_changeset_changes(changes):
                 'by deletion and recreation ',
                 fg='red') if rc['Replacement'] in ['True', True] else ''
 
-            scope_and_causing_entities = ','.join([f'{scope}(' + ','.join([det['CausingEntity'] for det in rc['Details'] if 'CausingEntity' in det])+ ')' for scope in rc['Scope']])
+            scope_and_causing_entities = ','.join([
+                f'{scope}(' + ','.join([
+                    det['CausingEntity']
+                    for det in rc['Details'] if 'CausingEntity' in det
+                ]) + ')' for scope in rc['Scope']
+            ])
 
             cause = f'caused by changes to: {scope_and_causing_entities}'
             click.secho(
