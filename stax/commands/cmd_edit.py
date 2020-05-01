@@ -10,7 +10,6 @@ from ..utils import class_filter, stack_options, set_stacks, plural
 
 @click.command()
 @stack_options
-@click.argument('name', required=False)
 def edit(ctx, accounts, regions, name):
     """
     Edit locally saved stacks
