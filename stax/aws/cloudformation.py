@@ -186,6 +186,13 @@ class Cloudformation:
         """
         return get_client(self.profile, self.region, 'cloudformation')
 
+    @property
+    def bucket_client(self):
+        """
+        Return the bucket client
+        """
+        return get_client(self.bucket['profile'], self.bucket['region'], 's3')
+
     def gen_stack(self, stack_json):
         if stack_json['StackName'].startswith('StackSet'):
             raise ValueError(f'Ignoring StackSet {stack_json["StackName"]}')
@@ -415,9 +422,18 @@ class Cloudformation:
         kwargs = dict(
             ChangeSetName=f'stax-{uuid.uuid4()}',
             StackName=self.name,
-            TemplateBody=self.template.raw,
             Capabilities=["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"],
         )
+
+        if len(self.template.raw) > 51200:
+            kwargs['TemplateBody'] = self.template.raw
+        else:
+            kwargs[
+                'TemplateURL'] = f'https://{self.bucket["name"]}.s3.{self.bucket["region"]}.amazonaws.com/stax/stax_template_{self.hash_of_template}'
+            self.bucket_client.put_object(
+                Body=self.template.raw,
+                Bucket=self.bucket['name'],
+                Key=f'stax/stax_template_{self.hash_of_template}')
         if use_existing_params:
             stack_describe = self.describe_stacks(name=self.name)[self.name]
             if 'Parameters' in stack_describe:
@@ -544,6 +560,7 @@ class Stack(Cloudformation):
         tags=None,
         template_body=None,
         template_file=None,
+        bucket=None,
         purge=False,
     ):
 
@@ -565,6 +582,8 @@ class Stack(Cloudformation):
         else:
             self.template = Template(template_file=template_file)
 
+        self.bucket = bucket
+
         self.tags = Tags(tags=tags)
 
         self.purge = purge
@@ -577,6 +596,13 @@ class Stack(Cloudformation):
         return hashlib.sha256(
             self.template.raw.encode('utf-8') +
             self.params.raw.encode('utf-8')).hexdigest()
+
+    @property
+    def hash_of_template(self):
+        """
+        Hash template to use for bucket filename
+        """
+        return hashlib.sha256(self.template.raw.encode('utf-8')).hexdigest()
 
     def pending_update(self, stax_hash):
         """

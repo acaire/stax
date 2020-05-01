@@ -83,6 +83,7 @@ def set_stacks(ctx):
               params=params_file if params_file else None,
               template_file=stack['template'],
               tags=stack.get('tags', {}),
+              bucket=stack.get('bucket', ctx.obj.config.get('default_bucket')),
               purge=stack.get('purge', False))
         for name, stack in ctx.obj.config['stacks'].items() for region in
         stack.get('regions',
