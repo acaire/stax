@@ -337,7 +337,9 @@ class Cloudformation:
             except botocore.exceptions.ClientError as err:
                 if err.response['Error']['Message'].find(
                         'does not exist') != -1:
-                    raise StackNotFound(f'{stack_to_describe["StackName"]} stack does not exist')
+                    raise StackNotFound(
+                        f'{stack_to_describe["StackName"]} stack does not exist'
+                    )
                 raise
         return results
 
