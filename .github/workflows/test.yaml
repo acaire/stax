@@ -25,4 +25,4 @@ jobs:
         pipenv run pytest
     - name: Test with yapf
       run: |
-        yapf -d -r setup.py tests stax
+        pipenv run yapf -d -r setup.py tests stax
