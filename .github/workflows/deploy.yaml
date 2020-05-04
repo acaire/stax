@@ -20,7 +20,7 @@ jobs:
         pip install pipenv setuptools wheel twine
     - name: Build
       run: |
-        pipenv run setup.py sdist bdist_wheel
+        pipenv run python setup.py sdist bdist_wheel
     - name: Publish
       uses: pypa/gh-action-pypi-publish@master
       with:
