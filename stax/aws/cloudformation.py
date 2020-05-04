@@ -337,7 +337,7 @@ class Cloudformation:
             except botocore.exceptions.ClientError as err:
                 if err.response['Error']['Message'].find(
                         'does not exist') != -1:
-                    raise StackNotFound(f'{name} stack does not exist')
+                    raise StackNotFound(f'{stack_to_describe["StackName"]} stack does not exist')
                 raise
         return results
 
@@ -347,7 +347,7 @@ class Cloudformation:
         Determine if an individual stack exists
         """
         try:
-            if self.describe_stacks(name=self.name):
+            if self.describe_stacks(names=[self.name]):
                 return True
         except StackNotFound:
             return False
@@ -453,7 +453,7 @@ class Cloudformation:
             Capabilities=["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"],
         )
 
-        if len(self.template.raw) > 51200:
+        if len(self.template.raw) <= 51200:
             kwargs['TemplateBody'] = self.template.raw
         else:
             kwargs[
