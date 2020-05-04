@@ -13,15 +13,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v1
       with:
-        python-version: '3.x'
+        python-version: '3.8'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine
+        pip install pipenv setuptools wheel twine
     - name: Build
       run: |
-        python setup.py sdist bdist_wheel
-
+        pipenv run setup.py sdist bdist_wheel
     - name: Publish
       uses: pypa/gh-action-pypi-publish@master
       with:
