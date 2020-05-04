@@ -4,11 +4,11 @@ Push local state to AWS Cloudformation
 import click
 
 from ..exceptions import StaxException
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
+@accounts_regions_and_names
 @click.argument('name', required=True)
 def delete(ctx, accounts, regions, name):
     """

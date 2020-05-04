@@ -9,15 +9,15 @@ import halo
 
 from ..aws.cloudformation import Cloudformation
 from ..exceptions import StackNotFound
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
+@accounts_regions_and_names
 @click.option('--force', is_flag=True)
 @click.option('--use-existing-params', is_flag=True)
 @click.option('--skip-tags', is_flag=True)
-def push(ctx, accounts, regions, name, force, use_existing_params, skip_tags):
+def push(ctx, accounts, regions, names, force, use_existing_params, skip_tags):
     """
     Create/Update live stacks
     """
@@ -25,7 +25,7 @@ def push(ctx, accounts, regions, name, force, use_existing_params, skip_tags):
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
-                                       name=name)
+                                       name=names)
 
     click.echo(f'Found {plural(count, "local stack")}')
 

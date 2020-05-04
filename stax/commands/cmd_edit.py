@@ -5,12 +5,12 @@ import collections
 
 import click
 
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
-def edit(ctx, accounts, regions, name):
+@accounts_regions_and_names
+def edit(ctx, accounts, regions, names):
     """
     Edit locally saved stacks
     """
@@ -18,7 +18,7 @@ def edit(ctx, accounts, regions, name):
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
-                                       name=name)
+                                       name=names)
 
     click.echo(f'Found {plural(count, "local stack")}')
 

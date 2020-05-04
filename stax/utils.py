@@ -62,12 +62,12 @@ _STACK_OPTIONS = [
                  type=click.Choice(DEFAULT_AWS_REGIONS),
                  multiple=True,
                  default=DEFAULT_AWS_REGIONS),
-    click.argument('name', required=False),
+    click.argument('names', required=False, nargs=-1),
     click.pass_context,
 ]
 
 
-def stack_options(func):
+def accounts_regions_and_names(func):
     for option in _STACK_OPTIONS:
         func = option(func)
     return func

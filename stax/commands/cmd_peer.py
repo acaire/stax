@@ -6,13 +6,12 @@ import collections
 import click
 import halo
 
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
-@click.argument('name', required=False)
-def peer(ctx, accounts, regions, name):
+@accounts_regions_and_names
+def peer(ctx, accounts, regions, names):
     """
     Peer into the outputs and resources of a stack
     """
@@ -20,7 +19,7 @@ def peer(ctx, accounts, regions, name):
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
-                                       name=name)
+                                       name=names)
 
     click.echo(f'Found {plural(count, "local stack")}\n')
 

@@ -4,13 +4,13 @@ Pull AWS Cloudformation stacks to local state
 import click
 
 from ..aws.cloudformation import Cloudformation
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
+@accounts_regions_and_names
 @click.option('--force', is_flag=True)
-def pull(ctx, accounts, regions, name, force):
+def pull(ctx, accounts, regions, names, force):
     """
     Pull live stacks
     """
@@ -19,7 +19,7 @@ def pull(ctx, accounts, regions, name, force):
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
-                                       name=name)
+                                       name=names)
 
     click.echo(f'Found {plural(count, "existing local stack")}')
 
@@ -29,5 +29,5 @@ def pull(ctx, accounts, regions, name, force):
             print('pulling region', region)
             cf = Cloudformation(account=account, region=region)
             cf.generate_stacks(local_stacks=found_stacks,
-                               stack_name=name,
+                               stack_names=names,
                                force=force)

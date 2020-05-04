@@ -5,13 +5,12 @@ import collections
 
 import click
 
-from ..utils import class_filter, stack_options, set_stacks, plural
+from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
 
 
 @click.command()
-@stack_options
-@click.argument('name', required=False)
-def summary(ctx, accounts, regions, name):
+@accounts_regions_and_names
+def summary(ctx, accounts, regions, names):
     """
     Show stax.json summary
     """
@@ -19,7 +18,7 @@ def summary(ctx, accounts, regions, name):
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
-                                       name=name)
+                                       name=names)
 
     accounts = collections.Counter()
 

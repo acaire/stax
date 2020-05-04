@@ -4,6 +4,8 @@ import hashlib
 import itertools
 import json
 import os
+import pathlib
+import string
 import sys
 import time
 import uuid
@@ -231,47 +233,69 @@ class Cloudformation:
 
         return stack
 
-    def save_stack(self, stack):
-        template_dest = f'aws/{stack.name}.{stack.account}.{stack.template.extn}'
+    def save_stack(self, stack, force):
+        with open('stax.json', 'r') as fh_read:
+            stack_json = json.load(fh_read)
+
+        try:
+            template_dest = string.Template(
+                stack_json['stacks'][stack.name]['template']).substitute(
+                    name=stack.name, account=stack.account)
+            template_val = template_dest
+        except:
+            template_dest = f'{stack.account}/{stack.name}/template.{stack.template.extn}'
+            template_val = f'$account/$name/template.{stack.template.extn}'
+            pathlib.Path(f'{stack.account}/{stack.name}').mkdir(parents=True,
+                                                                exist_ok=True)
+
+        try:
+            params_dest = string.Template(stack_json['stacks'][
+                stack.name]['parameters'][stack.account]).substitute(
+                    name=stack.name, account=stack.account)
+            params_val = params_dest
+        except:
+            params_dest = f'{stack.account}/{stack.name}/params.json'
+            params_val = f'$account/$name/params.json'
+            pathlib.Path(f'{stack.account}/{stack.name}').mkdir(parents=True,
+                                                                exist_ok=True)
+
         with open(template_dest, 'w') as fh:
             if stack.template.extn == 'yaml':
-                yaml.dump(stack.template.to_dict, fh, sort_keys=True)
+                # We can dump raw YAML - https://github.com/boto/boto3/issues/1468
+                fh.write(stack.template.raw)
             else:
-                json.dump(stack.template.to_dict, fh, sort_keys=True, indent=4)
+                # If the JSON template can be parsed, it's returned as a dict
+                # so we can't return the original file, so we may as well pretty it
+                json.dump(stack.template.to_dict, fh, indent=4)
+
+        if stack.name not in stack_json['stacks']:
+            stack_json['stacks'][stack.name] = {}
+        if 'parameters' not in stack_json['stacks'][stack.name]:
+            stack_json['stacks'][stack.name]['parameters'] = {}
 
         has_params = stack.params.to_dict
         if has_params:
-            with open(f'new-params/{stack.name}.{stack.account}.json',
-                      'w') as fh:
+            with open(params_dest, 'w') as fh:
                 json.dump(has_params, fh, sort_keys=True, indent=4)
+            stack_json['stacks'][stack.name]['parameters'][
+                stack.account] = params_val
+        else:
+            stack_json['stacks'][stack.name]['parameters'][stack.account] = ''
+        stack_json['stacks'][stack.name]['template'] = template_val
+        if 'regions' not in stack_json['stacks'][stack.name]:
+            stack_json['stacks'][stack.name]['regions'] = []
+        if self.region not in stack_json['stacks'][stack.name]['regions']:
+            stack_json['stacks'][stack.name]['regions'].append(self.region)
 
-        with open('stax.json', 'r') as fh_read:
-            stack_json = json.load(fh_read)
-            if stack.name not in stack_json['stacks']:
-                stack_json['stacks'][stack.name] = {}
-            if 'parameters' not in stack_json['stacks'][stack.name]:
-                stack_json['stacks'][stack.name]['parameters'] = {}
-            if has_params:
-                stack_json['stacks'][stack.name]['parameters'][
-                    stack.
-                    account] = f'new-params/{stack.name}.{stack.account}.json'
-            else:
-                stack_json['stacks'][stack.name]['parameters'][
-                    stack.account] = ''
-            stack_json['stacks'][stack.name]['template'] = template_dest
-            if 'regions' not in stack_json['stacks'][stack.name]:
-                stack_json['stacks'][stack.name]['regions'] = []
-            if self.region not in stack_json['stacks'][stack.name]['regions']:
-                stack_json['stacks'][stack.name]['regions'].append(self.region)
-            with open('stax.json', 'w') as fh_write:
-                json.dump(stack_json, fh_write, sort_keys=True, indent=4)
+        with open('stax.json', 'w') as fh_write:
+            json.dump(stack_json, fh_write, sort_keys=True, indent=4)
 
-    def generate_stacks(self, local_stacks={}, stack_name=None, force=False):
+    def generate_stacks(self, local_stacks={}, stack_names=None, force=False):
         """
         Pull down a list of created AWS stacks, and
         generate the configuration locally
         """
-        for _, remote_stack in self.describe_stacks(stack_name).items():
+        for _, remote_stack in self.describe_stacks(stack_names).items():
             if remote_stack['StackStatus'] in ['REVIEW_IN_PROGRESS']:
                 print(
                     f'Skipping {remote_stack["StackName"]} due to {remote_stack["StackStatus"]} status'
@@ -285,33 +309,37 @@ class Cloudformation:
 
             if force or parsed_stack not in local_stacks:
                 click.echo(f'Saving stack {parsed_stack.name}')
-                self.save_stack(parsed_stack)
+                self.save_stack(parsed_stack, force)
             else:
                 click.echo(
                     f'Skipping stack {parsed_stack.name} as it exists in stax.json - The live stack may differ, use --force to force'
                 )
 
-    def describe_stacks(self, name=None):
+    def describe_stacks(self, names=None):
         """
         Describe existing stacks
         """
-        kwargs = {}
-        if name is not None:
-            kwargs['StackName'] = name
-
-        paginator = self.client.get_paginator('describe_stacks')
-        response_iterator = paginator.paginate(**kwargs)
-
-        try:
-            return {
-                stack['StackName']: stack
-                for response in response_iterator
-                for stack in response['Stacks']
-            }
-        except botocore.exceptions.ClientError as err:
-            if err.response['Error']['Message'].find('does not exist') != -1:
-                raise StackNotFound(f'{name} stack does not exist')
-            raise
+        results = {}
+        list_of_stacks_to_describe = [{
+            'StackName': name
+        } for name in names] if names else [{}]
+        for stack_to_describe in list_of_stacks_to_describe:
+            paginator = self.client.get_paginator('describe_stacks')
+            response_iterator = paginator.paginate(**stack_to_describe)
+            try:
+                results = {
+                    **results,
+                    **{
+                        stack['StackName']: stack
+                        for name in names for response in response_iterator for stack in response['Stacks']
+                    }
+                }
+            except botocore.exceptions.ClientError as err:
+                if err.response['Error']['Message'].find(
+                        'does not exist') != -1:
+                    raise StackNotFound(f'{name} stack does not exist')
+                raise
+        return results
 
     @property
     def exists(self):
@@ -479,7 +507,22 @@ class Cloudformation:
             return
         spinner.succeed()
 
-        parse_changeset_changes(req['Changes'])
+        investigate = parse_changeset_changes(req['Changes'])
+
+        for thing in investigate:
+            if thing == 'Tags':
+                old_tags = self.describe_stacks(
+                    name=self.name)[self.name]['Tags']
+                new_tags = kwargs['Tags']
+                differences = [
+                    click.echo(f'{k}: \n' +
+                               click.style(f'  - {old_tags[k]}\n', fg=red) +
+                               click.style(f'  + {v}'))
+                    for k, v in new_tags.items() if old_tags.get(k) != v
+                ]
+
+                f'Are you sure you want to {click.style("create", fg="green")} {self.account}/{self.name} in {self.region}?'
+
         return cs_id
 
     def create(self):
@@ -580,7 +623,9 @@ class Stack(Cloudformation):
         if template_body:
             self.template = Template(template_body=template_body)
         else:
-            self.template = Template(template_file=template_file)
+            s = string.Template(template_file)
+            self.template = Template(
+                template_file=s.substitute(name=name, account=account))
 
         self.bucket = bucket
 
@@ -638,6 +683,9 @@ def parse_changeset_changes(changes):
     and highlight what has been added,
     modified and removed
     """
+    # Find out more about these attributes
+    dig_into = []
+
     for change in changes:
         rc = change['ResourceChange']
         if rc['Action'] == 'Add':
@@ -649,20 +697,25 @@ def parse_changeset_changes(changes):
                 'by deletion and recreation ',
                 fg='red') if rc['Replacement'] in ['True', True] else ''
 
-            scope_and_causing_entities = ','.join([
-                f'{scope}(' + ','.join([
-                    det['CausingEntity']
-                    for det in rc['Details'] if 'CausingEntity' in det
-                ]) + ')' for scope in rc['Scope']
-            ])
-
+            scope_and_causing_entities = {
+                scope: [
+                    detail['CausingEntity'] for detail in rc['Details']
+                    if 'CausingEntity' in rc
+                ]
+                for scope in rc['Scope']
+            }
             cause = f'caused by changes to: {scope_and_causing_entities}'
+
             click.secho(
                 f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be modified {mod_type}{cause}',
                 fg='yellow')
+
+            dig_into.extend(scope_and_causing_entities.keys())
+
         elif rc['Action'] == 'Remove':
             click.secho(
                 f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be deleted',
                 fg='red')
         else:
-            raise ValueError('Unhandled change')
+            raise ValueError('Unhandled change', change)
+    return dig_into
