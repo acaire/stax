@@ -5,6 +5,8 @@ verify_ssl = true
 
 [dev-packages]
 stax = {editable = true,path = "."}
+pytest = "*"
+yapf = "*"
 
 [packages]
 click = "*"
