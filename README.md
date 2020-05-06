@@ -8,7 +8,7 @@
 <a href="https://github.com/acaire/stax/actions"><img alt="Actions Status" src="https://github.com/acaire/stax/workflows/Test/badge.svg"></a>
 <a href="https://github.com/acaire/stax/blob/master/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/acaire/stax"></a>
 <a href="https://pypi.org/project/stax/"><img alt="PyPI" src="https://img.shields.io/pypi/v/stax"></a>
-<a href="https://hub.docker.com/r/acaire/stax/tags"><img alt="Docker Image" src="https://img.shields.io/docker/v/acaire/stax"></a>
+<a href="https://hub.docker.com/r/acaire/stax/tags"><img alt="Docker Image" src="https://img.shields.io/docker/v/acaire/stax?label=docker&color=blue"></a>
 
 <br/>
 
