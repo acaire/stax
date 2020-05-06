@@ -52,6 +52,9 @@ jobs:
       id: get_tag_name
       run: echo ::set-output name=TAG_NAME::$(echo $GITHUB_REF | cut -d / -f 3)
     - if: startsWith(github.event.ref, 'refs/tags')
+      name: Wait for the Pypi package to be ready
+      run: bash -c "while ! pip install stax==${{ steps.get_tag_name.outputs.TAG_NAME }}; do echo Sleeping for 5 seconds; sleep 5; done"
+    - if: startsWith(github.event.ref, 'refs/tags')
       name: Publish docker image
       uses: docker/build-push-action@v1
       with:
