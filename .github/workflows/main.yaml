@@ -36,7 +36,7 @@ jobs:
         python-version: '3.8'
     - name: Install publish dependencies
       run: |
-        pip install setuptools wheel twine
+        pip install pipenv setuptools wheel twine
     - name: Build package
       run: |
         pipenv run python setup.py sdist bdist_wheel
