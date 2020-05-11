@@ -387,7 +387,7 @@ class Cloudformation:
                 "BUILDKITE_BUILD_URL":
                 os.getenv("BUILDKITE_BUILD_URL", "dev"),
                 "BUILDKITE_REPO":
-                os.getenv("BUILDKITE_REPO", "dev"),
+                os.getenv("BUILDKITE_REPO", f"{gitlib.remotes()}"),
                 "BUILDKITE_BUILD_CREATOR":
                 os.getenv("BUILDKITE_BUILD_CREATOR", gitlib.user_email()),
                 "STAX_HASH":

@@ -23,6 +23,13 @@ def current_branch():
     return f'{REPO.active_branch}'
 
 
+def remotes():
+    """
+    Return a comma separated string of remotes
+    """
+    return ','.join([url for remote in REPO.remotes for url in remote.urls])
+
+
 def lookup_sha(revision=REPO.active_branch):
     """
     Return the current branch
