@@ -10,6 +10,7 @@ import sys
 import time
 import uuid
 import yaml
+import difflib
 
 import boto3
 import botocore
@@ -58,6 +59,34 @@ DEFAULT_AWS_REGIONS = [
     'us-west-1',
     'us-west-2',
 ]
+
+
+def get_diff(s1, s2, prefix):
+    before = prefix + 'before'
+    after = prefix + 'after'
+    if isinstance(s1, str):
+        s1 = s1.splitlines(keepends=True)
+    if isinstance(s2, str):
+        s2 = s2.splitlines(keepends=True)
+
+    return difflib.unified_diff(s1, s2, fromfile=before, tofile=after)
+
+
+def print_diff(diff):
+    changes = 0
+
+    for line in diff:
+        if line.startswith('+'):
+            click.secho(line, fg='green', nl=False)
+            changes += 1
+        elif line.startswith('-'):
+            click.secho(line, fg='red', nl=False)
+            changes += 1
+        else:
+            click.echo(line, nl=False)
+    if changes:
+        click.echo('\n')
+    return changes
 
 
 class Template:
