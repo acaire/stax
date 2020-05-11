@@ -74,22 +74,25 @@ def accounts_regions_and_names(func):
 
 
 def set_stacks(ctx):
-    ctx.obj.stacks = collections.defaultdict(dict)
+    ctx.obj.stacks = []
 
-    ctx.obj.stacks = [
-        Stack(name=name,
-              account=account,
-              region=region,
-              params=params_file if params_file else None,
-              template_file=stack['template'],
-              tags=stack.get('tags', {}),
-              bucket=stack.get('bucket', ctx.obj.config.get('default_bucket')),
-              purge=stack.get('purge', False))
-        for name, stack in ctx.obj.config['stacks'].items() for region in
-        stack.get('regions',
-                  [ctx.obj.config.get('default_region', 'ap-southeast-2')])
-        for account, params_file in stack['parameters'].items()
-    ]
+    for name, stack in ctx.obj.config['stacks'].items():
+        for region_and_account, params_file in stack['parameters'].items():
+            try:
+                region, account = region_and_account.split('/')
+            except ValueError:
+                account = region_and_account
+                region = ctx.obj.config['default_region']
+            ctx.obj.stacks.append(
+                Stack(name=name,
+                      account=account,
+                      region=region,
+                      params=params_file if params_file else None,
+                      template_file=stack['template'],
+                      tags=stack.get('tags', {}),
+                      bucket=stack.get('bucket',
+                                       ctx.obj.config.get('default_bucket')),
+                      purge=stack.get('purge', False)))
 
 
 def plural(count, singular, plural=None):
