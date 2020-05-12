@@ -101,4 +101,5 @@ def plural(count, singular, plural=None):
     else:
         if plural:
             return f'{count} {plural}'
-        return f'{count} {singular}s'
+        else:
+            return f'{count} {singular}s'
