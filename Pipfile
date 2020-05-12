@@ -15,6 +15,7 @@ boto3 = "*"
 halo = "*"
 pyyaml = "*"
 GitPython = "*"
+arrow = "*"
 
 [requires]
 python_version = "3.8"
