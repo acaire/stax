@@ -4,7 +4,8 @@ Push local state to AWS Cloudformation
 import click
 
 from ..exceptions import StaxException
-from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
+from ..utils import (accounts_regions_and_names, class_filter, plural,
+                     set_stacks)
 
 
 @click.command()

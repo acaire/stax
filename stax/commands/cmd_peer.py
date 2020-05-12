@@ -6,7 +6,8 @@ import collections
 import click
 import halo
 
-from ..utils import class_filter, accounts_regions_and_names, set_stacks, plural
+from ..utils import (accounts_regions_and_names, class_filter, plural,
+                     set_stacks)
 
 
 @click.command()

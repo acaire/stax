@@ -4,7 +4,7 @@ import sys
 
 import click
 
-from .aws.cloudformation import Stack, DEFAULT_AWS_REGIONS
+from .aws.cloudformation import DEFAULT_AWS_REGIONS, Stack
 
 
 def default_accounts(ctx, param, value):

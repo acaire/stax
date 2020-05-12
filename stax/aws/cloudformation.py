@@ -1,5 +1,6 @@
 import collections
 import datetime
+import difflib
 import hashlib
 import itertools
 import json
@@ -9,17 +10,16 @@ import string
 import sys
 import time
 import uuid
-import yaml
-import difflib
 
 import boto3
 import botocore
 import click
 import halo
+import yaml
 
-from .connection_manager import get_client
 from .. import gitlib
 from ..exceptions import StackNotFound
+from .connection_manager import get_client
 
 yaml.add_multi_constructor('!', lambda loader, suffix, node: None)
 

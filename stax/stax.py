@@ -3,10 +3,11 @@ Stax CLI
 
 Manage everything to do with Cloudformation
 """
-import click
 import json
 import os
 import sys
+
+import click
 
 from stax import __version__
 

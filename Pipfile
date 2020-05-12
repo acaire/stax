@@ -8,6 +8,7 @@ stax = {editable = true,path = "."}
 pytest = "*"
 yapf = "*"
 pre-commit = "*"
+isort = "*"
 
 [packages]
 click = "*"

@@ -2,10 +2,12 @@
 Git Helpers
 """
 
-import click
 import os
+import shlex
+import subprocess
+
+import click
 import git
-import subprocess, shlex
 
 try:
     REPO = git.Repo(os.getcwd(), search_parent_directories=True)
