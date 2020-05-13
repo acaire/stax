@@ -22,6 +22,10 @@ jobs:
     - name: Run pytest
       run: |
         pipenv run pytest
+    - name: Run Coveralls
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Run isort
       run: |
         pipenv run isort --recursive --check-only setup.py tests stax
