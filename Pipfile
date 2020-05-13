@@ -10,6 +10,7 @@ yapf = "*"
 pre-commit = "*"
 isort = "*"
 pytest-cov = "*"
+coveralls = "*"
 
 [packages]
 click = "*"
