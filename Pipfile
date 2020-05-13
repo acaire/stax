@@ -9,6 +9,7 @@ pytest = "*"
 yapf = "*"
 pre-commit = "*"
 isort = "*"
+pytest-cov = "*"
 
 [packages]
 click = "*"
