@@ -7,30 +7,36 @@ import sys
 import click
 import halo
 
-from ..aws.cloudformation import Cloudformation
-from ..exceptions import StackNotFound
-from ..utils import (accounts_regions_and_names, class_filter, plural,
-                     set_stacks)
+from stax.commands.common import accounts_regions_and_names, class_filter
+from stax.exceptions import StackNotFound
+from stax.stack import Cloudformation, load_stacks
+from stax.utils import plural
 
 
 @click.command()
 @accounts_regions_and_names
 @click.option('--force', is_flag=True)
-@click.option('--use-existing-params', is_flag=True)
-@click.option('--skip-tags', is_flag=True)
-def push(ctx, accounts, regions, names, force, use_existing_params, skip_tags):
+@click.option('--changeset')
+def push(ctx, accounts, regions, names, force, changeset):
     """
     Create/Update live stacks
     """
-    set_stacks(ctx)
+    load_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
                                        name=names)
 
-    click.echo(f'Found {plural(count, "local stack")}')
+    click.echo(f'Found {plural(count, "local stack")} to push')
 
-    describe_stacks = collections.defaultdict(dict)
+    # We're only expecting 1 stack if a changeset is passed
+    if changeset and len(found_stacks) != 1:
+        click.echo(
+            f'Error! The --changeset param was provided but {len(found_stacks)} stacks were found instead of 1'
+        )
+        exit(1)
+
+    stack_descriptions = collections.defaultdict(dict)
     to_change = []
 
     for stack in found_stacks:
@@ -39,23 +45,26 @@ def push(ctx, accounts, regions, names, force, use_existing_params, skip_tags):
         )
 
         # If we have a small number of stacks, it's faster to just create changesets
+        # to see if we have any updates that need to be performed
         if (len(found_stacks) < 20 or name or force or stack.purge):
             if stack.purge:
                 ctx.obj.debug(f'Checking to see if {stack.name} still exists')
                 if not stack.exists:
                     continue
             to_change.append(stack)
-        # Use describe stacks and compare STAX_HASH tag
+        # For a larger numer of stacks, describe stacks instead
+        # and use the STAX_HASH tags to determine if updates need to be made
         else:
-            key = f'{stack.account},{stack.region}'
-            if key not in describe_stacks:
-                cf = Cloudformation(account=stack.account, region=stack.region)
+            key = '{stack.account},{stack.region}'
+            if key not in stack_descriptions:
+                cf = cloudformation.Cloudformation(account=stack.account,
+                                                   region=stack.region)
                 with halo.Halo('Fetching stack status'):
-                    describe_stacks[key] = cf.describe_stacks()
+                    stack_descriptions[key] = cf.describe_stacks()
             try:
                 stax_hash = [
                     tag['Value']
-                    for tag in describe_stacks[key][stack.name]['Tags']
+                    for tag in stack_descriptions[key][stack.name]['Tags']
                     if tag['Key'] == 'STAX_HASH'
                 ][0]
             except (KeyError, IndexError):
@@ -66,17 +75,19 @@ def push(ctx, accounts, regions, names, force, use_existing_params, skip_tags):
         click.echo('No stacks found to update')
         sys.exit(1)
 
-    print('{} to update... {}\n'.format(
-        plural(len(to_change), 'stack'),
+    click.echo('{} ... {}\n'.format(
+        plural(len(to_change), 'stack needs an update',
+               'stacks need an update'),
         [stack.name for stack in to_change] if to_change else ''))
-    # Update should be more common than create, so let's assume that and save time
+    # Assume that update is more common than create and save some time
     for stack in to_change:
+        stack.diff
         if stack.purge is False:
             try:
-                stack.update(use_existing_params=use_existing_params,
-                             skip_tags=skip_tags)
+                stack.create_or_update(update=True,
+                                       existing_changeset=changeset)
             except StackNotFound:
-                stack.create()
+                stack.create_or_update(update=False)
             else:
                 ctx.obj.debug(f'No change required for {stack.name}')
         else:

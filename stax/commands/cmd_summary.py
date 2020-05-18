@@ -1,12 +1,13 @@
 """
-Summary
+Print a summary of locally defined Cloudformation stacks
 """
 import collections
 
 import click
 
-from ..utils import (accounts_regions_and_names, class_filter, plural,
-                     set_stacks)
+from stax.commands.common import accounts_regions_and_names, class_filter
+from stax.stack import Cloudformation, load_stacks
+from stax.utils import plural
 
 
 @click.command()
@@ -15,7 +16,7 @@ def summary(ctx, accounts, regions, names):
     """
     Show stax.json summary
     """
-    set_stacks(ctx)
+    load_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,

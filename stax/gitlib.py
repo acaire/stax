@@ -20,21 +20,21 @@ except git.exc.InvalidGitRepositoryError:
 
 def current_branch():
     """
-    Return the current branch
+    Return the current git branch
     """
     return f'{REPO.active_branch}'
 
 
 def remotes():
     """
-    Return a comma separated string of remotes
+    Return a comma separated string of git remotes
     """
     return ','.join([url for remote in REPO.remotes for url in remote.urls])
 
 
 def lookup_sha(revision=REPO.active_branch):
     """
-    Return the current branch
+    Return the current git SHA
     """
     return REPO.git.rev_parse(REPO.active_branch, short=True)
 
@@ -63,11 +63,11 @@ def user_email():
     return REPO.config_reader().get_value('user', 'email')
 
 
-def file_contents(filename, revision):
+def file_contents(file, revision):
     """
     Return the contents of a file from a specific revision
     """
-    return REPO.git.show(f'{revision}:{filename}')
+    return REPO.git.show(f'{revision}:{file}')
 
 
 def changed_files(revision="HEAD^1"):

@@ -1,7 +1,7 @@
 """
 Stax CLI
 
-Manage everything to do with Cloudformation
+Manage everything Cloudformation
 """
 import json
 import os
@@ -19,7 +19,8 @@ class Context:
     so that we can use a uniform debug/config
     interface.
     """
-    def __init__(self, debug):
+    def __init__(self, interface, debug):
+        self._interface = interface
         self._debug = debug
         self._config = None
 
@@ -63,9 +64,9 @@ class CLI(click.MultiCommand):
         to use as commands to the app
         """
         return [
-            os.path.splitext(filename)[0][4:]
-            for filename in sorted(os.listdir(cmd_path))
-            if filename.endswith('.py') and filename.startswith('cmd_')
+            os.path.splitext(file)[0][4:]
+            for file in sorted(os.listdir(cmd_path))
+            if file.endswith('.py') and file.startswith('cmd_')
         ]
 
     def get_command(self, ctx, name):
@@ -86,13 +87,17 @@ class CLI(click.MultiCommand):
 
 @click.command(cls=CLI)
 @click.version_option(version=__version__)
+@click.option("--interface",
+              default='cli',
+              help='The type of interface to use',
+              type=click.Choice(['cli']))
 @click.option("--debug", is_flag=True)
 @click.pass_context
-def cli(ctx, debug):
+def cli(ctx, interface, debug):
     """
-    Pystacks - Manage your Cloudformation Stacks
+    stax - Manage everything Cloudformation
     """
-    ctx.obj = Context(debug)
+    ctx.obj = Context(interface, debug)
 
 
 if __name__ == "__main__":

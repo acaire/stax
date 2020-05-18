@@ -1,11 +1,12 @@
 """
-Push local state to AWS Cloudformation
+Delete a single named Cloudformation stack
 """
 import click
 
-from ..exceptions import StaxException
-from ..utils import (accounts_regions_and_names, class_filter, plural,
-                     set_stacks)
+from stax.commands.common import accounts_regions_and_names, class_filter
+from stax.exceptions import StackNotFound
+from stax.stack import Cloudformation, load_stacks
+from stax.utils import plural
 
 
 @click.command()
@@ -15,7 +16,7 @@ def delete(ctx, accounts, regions, name):
     """
     Delete a single live stack
     """
-    set_stacks(ctx)
+    load_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
@@ -29,5 +30,5 @@ def delete(ctx, accounts, regions, name):
         )
         try:
             stack.delete()
-        except StaxException.StackNotFound as err:
-            print(err)
+        except StackNotFound as err:
+            click.echo(err)

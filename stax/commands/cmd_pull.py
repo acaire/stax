@@ -3,9 +3,9 @@ Pull AWS Cloudformation stacks to local state
 """
 import click
 
-from ..aws.cloudformation import Cloudformation
-from ..utils import (accounts_regions_and_names, class_filter, plural,
-                     set_stacks)
+from stax.commands.common import accounts_regions_and_names, class_filter
+from stax.stack import Cloudformation, generate_stacks, load_stacks
+from stax.utils import plural
 
 
 @click.command()
@@ -16,19 +16,24 @@ def pull(ctx, accounts, regions, names, force):
     Pull live stacks
     """
 
-    set_stacks(ctx)
+    load_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
                                        name=names)
 
-    click.echo(f'Found {plural(count, "existing local stack")}')
+    if count:
+        click.echo(
+            f'Found {plural(count, "existing local stack")} to be overwritten')
 
     for account in accounts:
-        print('pulling account', account)
+        click.echo(f'pulling account {account}')
         for region in regions:
-            print('pulling region', region)
+            click.echo(f'pulling region {region}')
             cf = Cloudformation(account=account, region=region)
-            cf.generate_stacks(local_stacks=found_stacks,
-                               stack_names=names,
-                               force=force)
+            remote_stacks = cf.describe_stacks(names=names)
+            generate_stacks(cf,
+                            local_stacks=found_stacks,
+                            remote_stacks=remote_stacks,
+                            stack_names=names,
+                            force=force)

@@ -1,12 +1,11 @@
 """
-Push local state to AWS Cloudformation
+Edit a locally defined Cloudformation stack
 """
-import collections
-
 import click
 
-from ..utils import (accounts_regions_and_names, class_filter, plural,
-                     set_stacks)
+from stax.commands.common import accounts_regions_and_names, class_filter
+from stax.stack import Cloudformation, load_stacks
+from stax.utils import plural
 
 
 @click.command()
@@ -15,19 +14,16 @@ def edit(ctx, accounts, regions, names):
     """
     Edit locally saved stacks
     """
-    set_stacks(ctx)
+    load_stacks(ctx)
     count, found_stacks = class_filter(ctx.obj.stacks,
                                        account=accounts,
                                        region=regions,
                                        name=names)
 
-    click.echo(f'Found {plural(count, "local stack")}')
-
-    describe_stacks = collections.defaultdict(dict)
-    to_change = []
+    click.echo(f'Found {plural(count, "local stack")} to edit')
 
     for stack in found_stacks:
         ctx.obj.debug(
             f'Found {stack.name} in region {stack.region} with account number {stack.account_id}'
         )
-        click.edit(filename=stack.template.file)
+        click.edit(file=stack.template.file)

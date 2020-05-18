@@ -12,7 +12,7 @@ def get_client(profile, region, client):
     """
     Fetch an AWS Client, and store it for later use
     """
-    client_key = (profile, region)
+    client_key = (profile, region, client)
     session_key = profile
 
     if client_key not in _CLIENTS:
