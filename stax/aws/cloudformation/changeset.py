@@ -32,7 +32,11 @@ def parse_changeset_changes(changes):
                 ]
                 for scope in rc['Scope']
             }
-            cause = f'caused by changes to: {scope_and_causing_entities}'
+            cause_string = ', '.join([
+                k if not v else k + v
+                for k, v in scope_and_causing_entities.items()
+            ])
+            cause = f'caused by changes to: {cause_string}'
 
             click.secho(
                 f'{rc["ResourceType"]} ({rc["LogicalResourceId"]}) will be modified {mod_type}{cause}',

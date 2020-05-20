@@ -1,6 +1,8 @@
 """
 Peer into the outputs and resources of a Cloudformation stack
 """
+import textwrap
+
 import click
 
 from stax.commands.common import accounts_regions_and_names, class_filter
@@ -30,11 +32,12 @@ def peer(ctx, accounts, regions, names):
 
         stack_dict = stack.template.to_dict
 
-        click.echo(stack_dict['Outputs'] if stack.template.
-                   to_dict['Outputs'] else None)
-
+        click.secho(click.style('Resources', bold=True), nl='')
         for resource in stack.resources:
-            click.echo(resource['LogicalResourceId'],
-                       resource['PhysicalResourceId'],
-                       resource['ResourceStatus'],
-                       resource.get('ResourceStatusReason', ''))
+            click.echo(
+                textwrap.dedent(f'''
+                 logical resource id: {resource["LogicalResourceId"]}
+                physical resource id: {resource["PhysicalResourceId"]}
+                     resource status: {resource["ResourceStatus"]}
+                       status reason: {resource.get("ResourceStatusReason", "")}'''
+                                ))

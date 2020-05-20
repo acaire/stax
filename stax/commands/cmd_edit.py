@@ -26,4 +26,6 @@ def edit(ctx, accounts, regions, names):
         ctx.obj.debug(
             f'Found {stack.name} in region {stack.region} with account number {stack.account_id}'
         )
-        click.edit(file=stack.template.file)
+        click.edit(filename=stack.template.filename)
+        if stack.params.filename:
+            click.edit(filename=stack.params.filename)

@@ -3,6 +3,7 @@ Common utilities
 """
 
 import difflib
+import json
 
 import click
 
@@ -20,18 +21,35 @@ def plural(count: int, singular: str, plural: str = "") -> str:
             return f'{count} {singular}s'
 
 
-def get_diff(s1: str, s2: str, prefix: str = "") -> difflib.unified_diff:
+def get_diff(before: any,
+             after: any,
+             prefix: str = "") -> difflib.unified_diff:
     """
     Diff two strings
     """
-    before = prefix + ' before'
-    after = prefix + ' after'
-    if isinstance(s1, str):
-        s1 = s1.splitlines(keepends=True)
-    if isinstance(s2, str):
-        s2 = s2.splitlines(keepends=True)
+    before_prefix = prefix + ' before'
+    after_prefix = prefix + ' after'
 
-    return difflib.unified_diff(s1, s2, fromfile=before, tofile=after)
+    if isinstance(before, list):
+        before = before.splitlines(keepends=True)
+    elif isinstance(before, dict):
+        before = json.dumps(before, indent=True,
+                            sort_keys=True).splitlines(keepends=True)
+    elif not isinstance(before, str):
+        raise ValueError(f'before {type(before)}')
+
+    if isinstance(after, list):
+        after = s2.splitlines(keepends=True)
+    elif isinstance(after, dict):
+        after = json.dumps(after, indent=True,
+                           sort_keys=True).splitlines(keepends=True)
+    elif not isinstance(after, str):
+        raise ValueError(f'after {type(after)}')
+
+    return difflib.unified_diff(before,
+                                after,
+                                fromfile=before_prefix,
+                                tofile=after_prefix)
 
 
 def print_diff(diff: difflib.unified_diff) -> int:
@@ -52,17 +70,3 @@ def print_diff(diff: difflib.unified_diff) -> int:
     if changes:
         click.echo('\n')
     return changes
-
-
-def list_to_dict(the_list, k, v):
-    """
-    Return a list of dictionaries
-    """
-    return {l[k]: l[v] for l in the_list}
-
-
-def dict_to_list(the_dict, key, value):
-    """
-    Return a dict of list items
-    """
-    return [{key: k, value: v} for k, v in the_dict.items()]

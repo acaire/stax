@@ -10,7 +10,8 @@ _SESSIONS = {}
 
 def get_client(profile, region, client):
     """
-    Fetch an AWS Client, and store it for later use
+    Fetch an AWS Client, and store it
+    incase it needs to be used again
     """
     client_key = (profile, region, client)
     session_key = profile
