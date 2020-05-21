@@ -46,7 +46,7 @@ def push(ctx, accounts, regions, names, force, changeset):
 
         # If we have a small number of stacks, it's faster to just create changesets
         # to see if we have any updates that need to be performed
-        if (len(found_stacks) < 20 or name or force or stack.purge):
+        if (len(found_stacks) > 20 or force or stack.purge):
             if stack.purge:
                 ctx.obj.debug(f'Checking to see if {stack.name} still exists')
                 if not stack.exists:
@@ -57,8 +57,7 @@ def push(ctx, accounts, regions, names, force, changeset):
         else:
             key = '{stack.account},{stack.region}'
             if key not in stack_descriptions:
-                cf = cloudformation.Cloudformation(account=stack.account,
-                                                   region=stack.region)
+                cf = Cloudformation(account=stack.account, region=stack.region)
                 with halo.Halo('Fetching stack status'):
                     stack_descriptions[key] = cf.describe_stacks()
             try:
@@ -81,9 +80,9 @@ def push(ctx, accounts, regions, names, force, changeset):
         [stack.name for stack in to_change] if to_change else ''))
     # Assume that update is more common than create and save some time
     for stack in to_change:
-        stack.diff
         if stack.purge is False:
             try:
+                stack.diff
                 stack.create_or_update(update=True,
                                        existing_changeset=changeset)
             except StackNotFound:

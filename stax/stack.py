@@ -15,57 +15,44 @@ def save_stack(stack, force):
     with click.open_file('stax.json', 'r') as fh_read:
         stack_json = json.load(fh_read)
 
-    try:
-        template_dest = string.Template(
-            stack_json['stacks'][stack.name]['template']).substitute(
-                name=stack.name, account=stack.account)
-        template_val = template_dest
-    except:
-        template_dest = f'{stack.account}/{stack.name}/template.{stack.template.extn}'
-        template_val = f'$account/$name/template.{stack.template.extn}'
-        #TODO: make this an option
-        template_val = template_dest
-        pathlib.Path(f'{stack.account}/{stack.name}').mkdir(parents=True,
-                                                            exist_ok=True)
+    region_and_account = f'{stack.region}/{stack.account}'
 
-    try:
-        params_dest = string.Template(
-            stack_json['stacks'][stack.name]['parameters']
-            [f'{stack.region}/{stack.account}']).substitute(
-                name=stack.name, account=stack.account)
-        params_val = params_dest
-    except:
-        params_dest = f'{stack.account}/{stack.name}/params.json'
-        params_val = f'$account/$name/params.json'
-        #TODO: make this an option
-        params_val = params_dest
-        pathlib.Path(f'{stack.account}/{stack.name}').mkdir(parents=True,
-                                                            exist_ok=True)
+    template_dest = pathlib.Path(
+        f'{stack.account}/{stack.name}/template.{stack.template.extn}')
 
-    with click.open_file(template_dest, 'w') as fh:
-        if stack.template.extn == 'yaml':
-            # We can dump raw YAML - https://github.com/boto/boto3/issues/1468
-            fh.write(stack.template.raw)
-        else:
-            # If the JSON template can be parsed, it's returned as a dict
-            # so we can't return the original file, so we may as well pretty it
-            json.dump(stack.template.to_dict, fh, indent=4)
+    params_dest = pathlib.Path(f'{stack.account}/{stack.name}/params.json')
 
-    if stack.name not in stack_json['stacks']:
-        stack_json['stacks'][stack.name] = {}
-    if 'parameters' not in stack_json['stacks'][stack.name]:
-        stack_json['stacks'][stack.name]['parameters'] = {}
-
-    has_params = stack.params.to_dict()
+    has_params = stack.params.to_dict
     if has_params:
+        no_echo_cmds = [k for k, v in has_params.items() if v == '*' * 4]
+        if no_echo_cmds and not click.confirm(
+            ('The following params have been saved with NoEcho'
+             f'  {no_echo_cmds} Do you wish to retrieve them?')):
+            print('Exiting without saving NoEcho params')
+            exit(1)
+
+        params_dest.parent.mkdir(parents=True, exist_ok=True)
         with click.open_file(params_dest, 'w') as fh:
             json.dump(has_params, fh, sort_keys=True, indent=4)
-        stack_json['stacks'][stack.name]['parameters'][
-            stack.account] = params_val
     else:
-        stack_json['stacks'][
-            stack.name]['parameters'][f'{stack.region}/{stack.account}'] = ''
-    stack_json['stacks'][stack.name]['template'] = template_val
+        params_dest = ''
+
+    generate_json = {
+        'parameters': {
+            region_and_account: str(params_dest)
+        },
+        'template': str(template_dest)
+    }
+
+    if stack.name not in stack_json['stacks']:
+        stack_json['stacks'][stack.name] = generate_json
+
+    with click.open_file(template_dest, 'w') as fh:
+        template_dest.parent.mkdir(parents=True, exist_ok=True)
+        if stack.template.extn == 'yaml':
+            yaml.dump(stack.template)
+        else:
+            json.dump(stack.template.to_dict, fh, indent=4)
 
     with click.open_file('stax.json', 'w') as fh_write:
         json.dump(stack_json, fh_write, sort_keys=True, indent=4)
@@ -75,7 +62,7 @@ def load_stacks(ctx):
     ctx.obj.stacks = []
 
     for name, stack in ctx.obj.config['stacks'].items():
-        for region_and_account, params_file in stack['parameters'].items():
+        for region_and_account, params_value in stack['parameters'].items():
             try:
                 region, account = region_and_account.split('/')
             except ValueError:
@@ -92,11 +79,10 @@ def load_stacks(ctx):
                 kwargs['tags_dict'] = tags
 
             # Check for params dict or string (file)
-            params = stack.get('params', {})
-            if isinstance(params, str):
-                kwargs['params_file'] = params
+            if isinstance(params_value, str):
+                kwargs['params_file'] = params_value
             else:
-                kwargs['params_dict'] = params
+                kwargs['params_dict'] = params_value
 
             ctx.obj.stacks.append(
                 Stack(name=name,
@@ -136,6 +122,8 @@ class Stack(Cloudformation):
         self.account = account
         self.region = region
 
+        self._description = None
+
         if [template_body, template_file].count(None) != 1:
             raise ValueError(
                 'You must enter either template_body or template_file')
@@ -150,20 +138,20 @@ class Stack(Cloudformation):
         self.bucket = bucket
 
         if params_dict:
-            self.params = Params(params_dict=params_dict)
+            self.params = Params(values=params_dict)
         else:
-            self.params = Params(params_file=params_file)
+            self.params = Params(filename=params_file)
 
         if tags_dict:
-            self._tags = Tags(tags_dict=tags_dict)
+            self._tags = Tags(values=tags_dict)
         else:
-            self._tags = Tags(tags_file=tags_file)
+            self._tags = Tags(filename=tags_file)
 
         self.purge = purge
 
     @property
     def tags(self):
-        return Tags(tags_dict={**self._tags.to_dict(), **self.default_tags})
+        return Tags(values={**self._tags.to_dict, **self.default_tags})
 
     @property
     def hash_of_params_and_template(self):
@@ -171,8 +159,8 @@ class Stack(Cloudformation):
         Hash parameters and templates to quickly determine if a stack needs to be updated
         """
         return hashlib.sha256(
-            self.template.raw.encode('utf-8') +
-            json.dumps(self.params.to_dict()).encode('utf-8')).hexdigest()
+            json.dumps(self.template.to_dict).encode('utf-8') +
+            json.dumps(self.params.to_dict).encode('utf-8')).hexdigest()
 
     @property
     def hash_of_template(self):

@@ -24,7 +24,7 @@ from stax.aws.cloudformation.params import Params
 from stax.aws.cloudformation.tags import Tags
 from stax.aws.cloudformation.template import Template
 from stax.exceptions import StackNotFound
-from stax.utils import dict_to_list, get_diff, list_to_dict, plural, print_diff
+from stax.utils import get_diff, plural, print_diff
 
 from ..connection_manager import get_client
 from .changeset import parse_changeset_changes
@@ -112,10 +112,16 @@ class Cloudformation:
                 if err.response['Error']['Message'].find(
                         'does not exist') != -1:
                     raise StackNotFound(
-                        f'{stack_to_describe["StackName"]} stack does not exist'
-                    )
+                        f'{kwargs["StackName"]} stack does not exist')
                 raise
         return results
+
+    @property
+    def description(self):
+        if not self._description:
+            self._description = self.describe_stacks(
+                names=[self.name])[self.name]
+        return self._description
 
     @property
     def describe(self):
@@ -130,7 +136,7 @@ class Cloudformation:
         Determine if an individual stack exists
         """
         try:
-            if self.describe:
+            if self.description:
                 return True
         except StackNotFound:
             return False
@@ -161,7 +167,7 @@ class Cloudformation:
         """
         Return live params
         """
-        params = Params(params_list=self.describe.get('Parameters', []))
+        params = Params(values=self.description.get('Parameters', []))
         return params
 
     @property
@@ -175,23 +181,25 @@ class Cloudformation:
 
     @property
     def diff(self):
-        diffs = []
-        diffs.append(
-            get_diff(self.live_params.string, self.params.string, 'params'))
-        diffs.append(get_diff(self.live_tags.string, self.tags.string, 'tags'))
-        diffs.append(
-            get_diff(self.live_template.string, self.template.string,
-                     'template'))
-        for diff in diffs:
-            print_diff(diff)
+        if self.exists:
+            diffs = []
+            diffs.append(
+                get_diff(self.live_params.to_dict, self.params.to_dict,
+                         'params'))
+            diffs.append(
+                get_diff(self.live_tags.to_dict, self.tags.to_dict, 'tags'))
+            diffs.append(
+                get_diff(self.live_template.to_dict, self.template.to_dict,
+                         'template'))
+            for diff in diffs:
+                print_diff(diff)
 
     @property
     def live_tags(self):
         """
         Return live tags
         """
-        tags = Tags(tags_list=self.describe.get('Tags', []))
-        return tags
+        return Tags(values=self.description.get('Tags', []))
 
     @property
     def default_tags(self):
@@ -218,8 +226,10 @@ class Cloudformation:
         """
         Return stack resources
         """
-        req = self.client.describe_stack_resources(StackName=self.name)
-        return req['StackResources']
+        if not self._resources:
+            req = self.client.describe_stack_resources(StackName=self.name)
+            self._resources = req['StackResources']
+        return self._resources
 
     def wait_for_stack_update(self, action=None):
         """
@@ -229,7 +239,7 @@ class Cloudformation:
         if action == 'deletion':
             kwargs['color'] = 'red'
 
-        with Halo(**kwargs) as spinner:
+        with halo.Halo(**kwargs) as spinner:
             while True:
                 try:
                     req = self.client.describe_stacks(StackName=self.name)
@@ -266,6 +276,7 @@ class Cloudformation:
 
     def look_into_changeset_stuff(self, req):
         investigate = parse_changeset_changes(req['Changes'])
+        #print(investigate)
 
         old_template = self.client.get_template(
             StackName=self.name)['TemplateBody']
@@ -286,24 +297,11 @@ class Cloudformation:
             new_template = json.dumps(new_template, indent=4, sort_keys=True)
 
         my_diff = get_diff(old_template, new_template, 'template_')
-        print_diff(my_diff)
+        #print_diff(my_diff)
 
-        params_passed = self.params.to_list()
         my_diff = get_diff(
-            json.dumps(
-                {
-                    param['ParameterKey']: param['ParameterValue']
-                    for param in self.describe.get('Parameters', [])
-                },
-                indent=4,
-                sort_keys=True),
-            json.dumps({
-                param['ParameterKey']: param['ParameterValue']
-                for param in params_passed
-            } if params_passed else {},
-                       indent=4,
-                       sort_keys=True), 'params_')
-        print_diff(my_diff)
+            Params(values=self.description.get('Parameters', [])).to_dict,
+            self.params.to_dict)
 
         return req['ChangeSetId']
 
@@ -337,8 +335,8 @@ class Cloudformation:
                     Bucket=self.bucket['name'],
                     Key=f'stax/stax_template_{self.hash_of_template}')
 
-            kwargs['Parameters'] = self.params.to_list()
-            kwargs['Tags'] = self.tags.to_list()
+            kwargs['Parameters'] = self.params.to_list
+            kwargs['Tags'] = self.tags.to_list
 
             try:
                 req = self.client.create_change_set(ChangeSetType=set_type,
@@ -445,7 +443,8 @@ class Cloudformation:
         else:
             changeset = self.changeset_create_and_wait(set_type.upper())
 
-        self.look_into_changeset_stuff(changeset)
+        if changeset and set_type == 'update':
+            self.look_into_changeset_stuff(changeset)
 
         if not changeset:
             return
@@ -462,7 +461,8 @@ class Cloudformation:
             return
 
         # Execute changeset
-        req = self.client.execute_change_set(ChangeSetName=changeset)
+        req = self.client.execute_change_set(
+            ChangeSetName=changeset['ChangeSetId'])
 
         # Wait for changes
         self.wait_for_stack_update()
