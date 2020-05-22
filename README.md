@@ -50,8 +50,11 @@ direnv allow
 pip install pre-commit
 pre-commit install
 
+# Install pipenv
+pip install pipenv
+
 # Install editable version
-pip install -e .
+pipenv install --dev
 
 # Run stax
 stax
