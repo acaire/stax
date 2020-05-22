@@ -191,8 +191,10 @@ class Cloudformation:
             diffs.append(
                 get_diff(self.live_tags.to_dict, self.tags.to_dict, 'tags'))
             diffs.append(
-                get_diff(self.live_template.to_dict, self.template.to_dict,
-                         'template'))
+                get_diff(self.live_template.to_dict,
+                         self.template.to_dict,
+                         'template',
+                         fmt=self.template.extn))
             for diff in diffs:
                 print_diff(diff)
 
