@@ -6,6 +6,7 @@ import difflib
 import json
 
 import click
+import yaml
 
 
 def plural(count: int, singular: str, plural: str = "") -> str:
@@ -23,7 +24,8 @@ def plural(count: int, singular: str, plural: str = "") -> str:
 
 def get_diff(before: any,
              after: any,
-             prefix: str = "") -> difflib.unified_diff:
+             prefix: str = "",
+             fmt: str = "json") -> difflib.unified_diff:
     """
     Diff two strings
     """
@@ -33,16 +35,22 @@ def get_diff(before: any,
     if isinstance(before, list):
         before = before.splitlines(keepends=True)
     elif isinstance(before, dict):
-        before = json.dumps(before, indent=True,
-                            sort_keys=True).splitlines(keepends=True)
+        if fmt == 'yaml':
+            before = yaml.dump(before).splitlines(keepends=True)
+        else:
+            before = json.dumps(before, indent=True,
+                                sort_keys=True).splitlines(keepends=True)
     elif not isinstance(before, str):
         raise ValueError(f'before {type(before)}')
 
     if isinstance(after, list):
         after = s2.splitlines(keepends=True)
     elif isinstance(after, dict):
-        after = json.dumps(after, indent=True,
-                           sort_keys=True).splitlines(keepends=True)
+        if fmt == 'yaml':
+            after = yaml.dump(after).splitlines(keepends=True)
+        else:
+            after = json.dumps(after, indent=True,
+                               sort_keys=True).splitlines(keepends=True)
     elif not isinstance(after, str):
         raise ValueError(f'after {type(after)}')
 

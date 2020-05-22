@@ -167,6 +167,8 @@ class Cloudformation:
         """
         Return live params
         """
+        # convert OrderedDict to dict
+        #params = Params(values=[dict(param) for param in self.description.get('Parameters', [])])
         params = Params(values=self.description.get('Parameters', []))
         return params
 
@@ -282,30 +284,40 @@ class Cloudformation:
             StackName=self.name)['TemplateBody']
         new_template = self.template.raw
 
-        if isinstance(old_template, str):
+        if self.template.extn == 'yaml':
+            old_template = yaml.dump(old_template, indent=4, sort_keys=True)
+        elif isinstance(old_template, str):
             old_template = json.dumps(json.loads(old_template),
                                       indent=4,
                                       sort_keys=True)
         else:
             old_template = json.dumps(old_template, indent=4, sort_keys=True)
 
-        if isinstance(new_template, str):
+        if self.template.extn == 'yaml':
+            new_template = yaml.dump(new_template, indent=4, sort_keys=True)
+        elif isinstance(new_template, str):
             new_template = json.dumps(json.loads(new_template),
                                       indent=4,
                                       sort_keys=True)
         else:
             new_template = json.dumps(new_template, indent=4, sort_keys=True)
 
-        my_diff = get_diff(old_template, new_template, 'template_')
-        #print_diff(my_diff)
+        my_diff = get_diff(old_template,
+                           new_template,
+                           'template_',
+                           fmt=self.template.extn)
 
         my_diff = get_diff(
             Params(values=self.description.get('Parameters', [])).to_dict,
-            self.params.to_dict)
+            self.params.to_dict,
+            fmt=self.template.extn)
 
         return req['ChangeSetId']
 
-    def changeset_create_and_wait(self, set_type):
+    def changeset_create_and_wait(self,
+                                  set_type,
+                                  existing_params=False,
+                                  existing_template=True):
         """
         Request a changeset, and wait for creation
         """
@@ -318,25 +330,34 @@ class Cloudformation:
                 Capabilities=["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"],
             )
 
-            # Large templates need to be pushed to S3 first - https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html
-            template_size_limit = 51200
-            if len(self.template.raw) <= template_size_limit:
-                kwargs['TemplateBody'] = self.template.raw
+            if existing_template:
+                kwargs['UsePreviousTemplate'] = True
             else:
-                if not self.bucket['name']:
-                    click.echo(
-                        'The template for this file is {len(self.template.raw)}, which is larger than {template_size_limit}'
-                    )
-                    exit(1)
-                kwargs[
-                    'TemplateURL'] = f'https://{self.bucket["name"]}.s3.{self.bucket["region"]}.amazonaws.com/stax/stax_template_{self.hash_of_template}'
-                self.bucket_client.put_object(
-                    Body=self.template.raw,
-                    Bucket=self.bucket['name'],
-                    Key=f'stax/stax_template_{self.hash_of_template}')
+                # Large templates need to be pushed to S3 first - https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html
+                template_size_limit = 51200
+                if len(self.template.raw) <= template_size_limit:
+                    kwargs['TemplateBody'] = self.template.raw
+                else:
+                    if not self.bucket['name']:
+                        click.echo(
+                            'The template for this file is {len(self.template.raw)}, which is larger than {template_size_limit}'
+                        )
+                        exit(1)
+                    kwargs[
+                        'TemplateURL'] = f'https://{self.bucket["name"]}.s3.{self.bucket["region"]}.amazonaws.com/stax/stax_template_{self.hash_of_template}'
+                    self.bucket_client.put_object(
+                        Body=self.template.raw,
+                        Bucket=self.bucket['name'],
+                        Key=f'stax/stax_template_{self.hash_of_template}')
 
-            kwargs['Parameters'] = self.params.to_list
-            kwargs['Tags'] = self.tags.to_list
+            if existing_params:
+                kwargs[
+                    'Parameters'] = self.live_params.to_list_with_previous_values
+            else:
+                kwargs['Parameters'] = self.params.to_list
+
+            if not existing_template and not existing_params:
+                kwargs['Tags'] = self.tags.to_list
 
             try:
                 req = self.client.create_change_set(ChangeSetType=set_type,
@@ -414,7 +435,11 @@ class Cloudformation:
             self.wait_for_stack_update('deletion')
             spinner.succeed(f'{self.name} deleted')
 
-    def create_or_update(self, update, existing_changeset=None):
+    def create_or_update(self,
+                         update,
+                         existing_changeset=None,
+                         existing_params=False,
+                         existing_template=False):
         """
         Create or Update a stack via change set
         """
@@ -441,7 +466,10 @@ class Cloudformation:
                 )
                 exit(1)
         else:
-            changeset = self.changeset_create_and_wait(set_type.upper())
+            changeset = self.changeset_create_and_wait(
+                set_type.upper(),
+                existing_params=existing_params,
+                existing_template=existing_template)
 
         if changeset and set_type == 'update':
             self.look_into_changeset_stuff(changeset)

@@ -50,7 +50,7 @@ class KeyValue:
         """
         Return a dictionary of Cloudformation Parameters
         """
-        return self.__values
+        return self.values
 
     @property
     def to_list(self):
@@ -60,4 +60,4 @@ class KeyValue:
         return [{
             self.list_key_name: k,
             self.list_value_name: v
-        } for k, v in self.__values.items()]
+        } for k, v in self.to_dict.items()]

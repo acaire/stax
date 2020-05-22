@@ -30,6 +30,10 @@ def save_stack(stack, force):
              f'  {no_echo_cmds} Do you wish to retrieve them?')):
             print('Exiting without saving NoEcho params')
             exit(1)
+        else:
+            stack.create_or_update(update=True,
+                                   existing_params=True,
+                                   existing_template=True)
 
         params_dest.parent.mkdir(parents=True, exist_ok=True)
         with click.open_file(params_dest, 'w') as fh:
